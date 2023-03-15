@@ -5,15 +5,14 @@ const Param = struct {
   deviceId      : []u8 = undefined,
   clientMac     : []u8 = undefined,
   clientIp      : []u8 = undefined,
-  clientPort    : i32 = -1,
+  clientPort    : i32 = 10000,
   serverMac     : []u8 = undefined,
   serverIp      : []u8 = undefined,
-  serverPort    : i32 = -1,
-  iters         : i32 = -1,
-  txQueueSize   : i32 = -1,
-  rxQueueSize   : i32 = -1,
-  payloadSize   : i32 = -1,
-  allocator     : std.mem.Allocator = std.heap.page_allocator,
+  serverPort    : i32 = 10013,
+  iters         : i32 = 5000,
+  txQueueSize   : i32 = 128,
+  rxQueueSize   : i32 = 128,
+  payloadSize   : i32 = 32,
   useHugePages  : bool = false,
   isServer      : bool = false,
 
@@ -74,8 +73,6 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
   while (opts.next()) |maybe_opt| {
     if (maybe_opt) |opt| {
       arg = opt.arg.?;
-      std.debug.print("arg len {any}\n", .{arg.len});
-      std.debug.print("arg ptr {any}\n", .{arg.ptr});
       switch (opt.opt) {
         'd', 'B', 'j', 'E', 'J' => {
           if (allocator.dupe(u8, arg)) |ptr| {
