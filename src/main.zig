@@ -3,12 +3,12 @@ const getopt = @import("getopt");
 const ice = @cImport({@cInclude("ib_device.h");});
 
 const Param = struct {
-  deviceId      : []u8 = undefined,
-  clientMac     : []u8 = undefined,
-  clientIp      : []u8 = undefined,
+  deviceId      : [:0]u8 = undefined,
+  clientMac     : [:0]u8 = undefined,
+  clientIp      : [:0]u8 = undefined,
   clientPort    : i32 = 10000,
-  serverMac     : []u8 = undefined,
-  serverIp      : []u8 = undefined,
+  serverMac     : [:0]u8 = undefined,
+  serverIp      : [:0]u8 = undefined,
   serverPort    : i32 = 10013,
   iters         : i32 = 5000,
   txQueueSize   : i32 = 128,
@@ -69,7 +69,7 @@ pub fn usageAndExit(param: *Param) void {
 pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
   var valid = true;
   var intArg: i32 = undefined;
-  var argCopy: []u8 = undefined; 
+  var argCopy: [:0]u8 = undefined; 
   var arg: []const u8 = undefined;
   var opts = getopt.getopt("d:B:j:k:E:J:K:n:t:r:s:HSh");
 
@@ -78,7 +78,7 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
       arg = opt.arg.?;
       switch (opt.opt) {
         'd', 'B', 'j', 'E', 'J' => {
-          if (allocator.dupe(u8, arg)) |ptr| {
+          if (allocator.dupeZ(u8, arg)) |ptr| {
             argCopy = ptr;
           } else |err| switch(err) {
             error.OutOfMemory => {
