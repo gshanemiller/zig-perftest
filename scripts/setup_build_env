@@ -59,7 +59,7 @@ echo "alias ll=\"ls -la\"" >> ${HOME}/.bashrc
 echo "alias edit=\"vi\"" >> ${HOME}/.bashrc
 echo "alias ppjson=\"python3 -m json.tool\"" >> ${HOME}/.bashrc
 echo "alias zb=\"zig build\"" >> ${HOME}/.bashrc
-echo "alias zr=\"./zig-out/bin/zig-perftest -d bubba -B X8:c0:eb:d4:ec:07 -E X8:c0:eb:d4:ec:07 -j 192.168.0.2 -J 192.168.0.2\"" >> ${HOME}/.bashrc
+echo "alias zr=\"./zig-out/bin/zig-perftest -d rocep1s0f1 -B X8:c0:eb:d4:ec:07 -E X8:c0:eb:d4:ec:07 -j 192.168.0.2 -J 192.168.0.2\"" >> ${HOME}/.bashrc
 
 #
 # Add variables to .vimrc
@@ -78,6 +78,15 @@ echo ":set colorcolumn=120" >> ~/.vimrc
 # git needs this
 git config --global user.email "gshanemiller6@gmail.com"
 git config --global user.name "smiller"
+
+# setup run env so can
+./scripts/setup_run_env
+mlxconfig -y -d /dev/mst/mt4119_pciconf0.1 set KEEP_IB_LINK_UP_P1=1 KEEP_IB_LINK_UP_P2=1
+
+#
+echo
+echo You need to fix /etc/system/network as per:
+echo https://github.com/gshanemiller/reinvent/blob/main/doc/equinix_mellanox_setup.md#procedure-part-2-of-3
 
 # 
 echo
