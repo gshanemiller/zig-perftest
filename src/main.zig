@@ -1,5 +1,6 @@
 const std = @import("std");
 const getopt = @import("getopt");
+const ice = @cImport({@cInclude("./src/ib/ib_device.h");});
 
 const Param = struct {
   deviceId      : []u8 = undefined,
@@ -219,6 +220,7 @@ pub fn main() u8 {
   param.print();
 
   std.log.debug("binding to '{s}' ...\n", .{param.deviceId});
+  ice.ice_ib_find_device(param.deviceId.ptr, 0);
 
   return 0;
 }

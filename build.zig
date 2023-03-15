@@ -47,6 +47,9 @@ pub fn build(b: *std.build.Builder) void {
     // C source code
     exe.addCSourceFiles(&sourceCodeFiles, &cflags);
 
+    // Link in glibc
+    exe.linkLibC();
+
     exe.install();
 
     const run_cmd = exe.run();
