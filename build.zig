@@ -13,7 +13,7 @@ pub fn build(b: *std.build.Builder) void {
 
     const exe = b.addExecutable("zig-perftest", "src/main.zig");
 
-    exe.addPackagePath("clap", "libs/clap/clap.zig");
+    exe.addPackagePath("getopt", "libs/getopt/getopt.zig");
 
     exe.setTarget(target);
     exe.setBuildMode(mode);
