@@ -50,6 +50,17 @@ pub fn build(b: *std.build.Builder) void {
     // Link in glibc
     exe.linkLibC();
 
+    // And link in dependent IB libraries
+    exe.linkSystemLibrary("ibumad");
+    exe.linkSystemLibrary("mlx5");
+    exe.linkSystemLibrary("efa");
+    exe.linkSystemLibrary("rdmacm");
+    exe.linkSystemLibrary("ibverbs");
+    exe.linkSystemLibrary("pci");
+    exe.linkSystemLibrary("pthread");
+    exe.linkSystemLibrary("nl-route-3");
+    exe.linkSystemLibrary("nl-3");
+
     exe.install();
 
     const run_cmd = exe.run();

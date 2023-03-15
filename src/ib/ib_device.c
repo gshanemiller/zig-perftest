@@ -1,13 +1,16 @@
 #include <ib_device.h>
 #include <string.h>
+#include <stdio.h>
 
-int ice_ib_find_device(const char *deviceName, struct ibv_device **device) {
+int ice_ib_find_device(const char *deviceName) {
   assert(deviceName);
   assert(strlen(deviceName)>0);
-  assert(device);
+  // assert(device);
 
   // Initialize
-  *device = 0;
+  // *device = 0;
+
+  printf("made it with '%s'\n", deviceName);
 
   // Request device list and iterate until found
   int deviceCount = 0;

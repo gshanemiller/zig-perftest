@@ -58,6 +58,8 @@ echo "export PKG_CONFIG_PATH=${D}/lib/x86_64-linux-gnu/pkgconfig" >> ${HOME}/.ba
 echo "alias ll=\"ls -la\"" >> ${HOME}/.bashrc
 echo "alias edit=\"vi\"" >> ${HOME}/.bashrc
 echo "alias ppjson=\"python3 -m json.tool\"" >> ${HOME}/.bashrc
+echo "alias zb=\"zig build\"" >> ${HOME}/.bashrc
+echo "alias zr=\"./zig-out/bin/zig-perftest -d bubba -B X8:c0:eb:d4:ec:07 -E X8:c0:eb:d4:ec:07 -j 192.168.0.2 -J 192.168.0.2\"" >> ${HOME}/.bashrc
 
 #
 # Add variables to .vimrc
