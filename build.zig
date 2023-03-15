@@ -17,6 +17,36 @@ pub fn build(b: *std.build.Builder) void {
 
     exe.setTarget(target);
     exe.setBuildMode(mode);
+
+    // C compliation options
+    const cflags = [_][]const u8{
+      "-D_GNU_SOURCE",
+      "-g",
+      "-O2",
+      "-Wall",
+//    "-Werror",
+      "-march=native",
+      "-std=c11",
+    };
+
+    // C source code
+    const sourceCodeFiles = [_][]const u8{
+      "./src/ib/ib_common.c",
+      "./src/ib/ib_device.c",
+    };
+
+    // C include paths
+    exe.addIncludePath("./src/ib");
+    exe.addIncludePath("/usr/include");
+    exe.addIncludePath("/usr/include/infiniband");
+    exe.addIncludePath("/usr/include/x86_64-linux-gnu");
+
+    // C linker paths
+    exe.addLibraryPath("/usr/lib/x86_64-linux-gnu");
+
+    // C source code
+    exe.addCSourceFiles(&sourceCodeFiles, &cflags);
+
     exe.install();
 
     const run_cmd = exe.run();

@@ -218,5 +218,7 @@ pub fn main() u8 {
 
   param.print();
 
+  std.log.debug("binding to '{s}' ...\n", .{param.deviceId});
+
   return 0;
 }
