@@ -43,20 +43,22 @@ const Param = struct {
   }
 };
 
-pub fn usageAndExit() void {
+pub fn usageAndExit(param: *Param) void {
   std.debug.print("Benchmark sending and receiving ethernet IPV4 UDP packets over Infiniband API.\n\n", .{});
   std.debug.print("usage: perftest ...options...\n\n", .{});
   std.debug.print("-d <string>      required: infiniband device name from 'ibstats'\n", .{});
-  std.debug.print("-B <string>      required: client (data transmitter) ethernet MAC address (ex. 08:c0:eb:d4:ec:07)\n", .{});
+  std.debug.print("-B <string>      required: client ethernet MAC address (ex. 08:c0:eb:d4:ec:07)\n", .{});
   std.debug.print("-j <string>      required: client IPV4 address (ex. 192.168.0.2)\n", .{});
-  std.debug.print("-k <int>         required: client IPV4 port in [1025,65535)\n", .{});
-  std.debug.print("-E <string>      required: server (data transmitter) ethernet MAC address (ex. 08:c0:eb:d4:ec:07)\n", .{});
+  std.debug.print("-E <string>      required: server ethernet MAC address (ex. 08:c0:eb:d4:ec:07)\n", .{});
   std.debug.print("-J <string>      required: server IPV4 address (ex. 192.168.0.2)\n", .{});
-  std.debug.print("-K <int>         required: server IPV4 port in [1025,65535)\n", .{});
-  std.debug.print("-n <int>         optional: number of packets >0 to send\n", .{});
-  std.debug.print("-t <int>         optional: number of client TX request items in [1,4096]\n", .{});
-  std.debug.print("-r <int>         optional: number of server RX request items in [1,4096]\n", .{});
-  std.debug.print("-s <int>         optional: size of packet payload in [32, 65536]\n", .{});
+
+  std.debug.print("-K <int>         optional: server IPV4 port (default {d}) in [1025,65535)\n", .{param.clientPort});
+  std.debug.print("-k <int>         optional: client IPV4 port (default {d}) in [1025,65535)\n", .{param.serverPort});
+  std.debug.print("-n <int>         optional: number of packets >0 to send (default {d})\n", .{param.iters});
+  std.debug.print("-t <int>         optional: number of client TX request items (default {d}) in [1,4096]\n", .{param.txQueueSize});
+  std.debug.print("-r <int>         optional: number of server RX request items (default {d}) in [1,4096]\n", .{param.rxQueueSize});
+  std.debug.print("-s <int>         optional: size of packet payload (default {d}) in [32, 65536]\n", .{param.payloadSize});
+
   std.debug.print("-H               optional: allocate memory from 2048KB hugepage memory\n", .{});
   std.debug.print("-S               optional: run in server mode and client model if omitted\n", .{});
   std.debug.print("-h               optional: show usage and exit\n", .{});
@@ -109,11 +111,11 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
           } else |err| switch (err) {
             std.fmt.ParseIntError.InvalidCharacter => {
               std.debug.panic("invalid character integer: '{any}'\n", .{arg});
-              usageAndExit();
+              usageAndExit(param);
             },
             std.fmt.ParseIntError.Overflow => {
               std.debug.panic("integer overflow: '{any}'\n", .{arg});
-              usageAndExit();
+              usageAndExit(param);
             },
           }
           switch (opt.opt) {
@@ -147,10 +149,10 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
           param.useHugePages = true;
         },
         'h' => {
-          usageAndExit();
+          usageAndExit(param);
         },
         else => {
-          usageAndExit();
+          usageAndExit(param);
         },
       }
     } else {
@@ -158,8 +160,8 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
     }
   } else |err| {
     switch (err) {
-      getopt.Error.InvalidOption    => usageAndExit(),
-      getopt.Error.MissingArgument  => usageAndExit(),
+      getopt.Error.InvalidOption    => usageAndExit(param),
+      getopt.Error.MissingArgument  => usageAndExit(param),
     }
     valid = false;
   }
@@ -199,7 +201,7 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
   }
 
   if (!valid) {
-    usageAndExit();
+    usageAndExit(param);
   }
 
   return 0;

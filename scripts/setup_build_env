@@ -42,12 +42,10 @@ cd ${MFT%%.tgz}
 ./install.sh --oem
 
 #
-# build perftest
+# build zig-perftest
 #
-cd ~/Dev/perftest
-./autogen.sh
-./configure
-make
+cd ~/Dev/zig-perftest
+zig build
 
 #
 # Add variables to ~/.bashrc
