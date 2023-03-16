@@ -51,7 +51,6 @@ pub fn build(b: *std.build.Builder) void {
     exe.linkLibC();
 
     // And link in dependent IB libraries
-    exe.linkSystemLibrary("ibumad");
     exe.linkSystemLibrary("mlx5");
     exe.linkSystemLibrary("efa");
     exe.linkSystemLibrary("rdmacm");
