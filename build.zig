@@ -13,6 +13,10 @@ pub fn build(b: *std.build.Builder) void {
 
     const exe = b.addExecutable("zig-perftest", "src/main.zig");
 
+    std.debug.print("before {any}\n", .{exe.linkage});
+    exe.linkage = std.build.LibExeObjStep.Linkage.dynamic;
+    std.debug.print("after {any}\n", .{exe.linkage});
+
     exe.addPackagePath("getopt", "libs/getopt/getopt.zig");
 
     exe.setTarget(target);
@@ -60,6 +64,14 @@ pub fn build(b: *std.build.Builder) void {
     exe.linkSystemLibrary("nl-route-3");
     exe.linkSystemLibrary("nl-3");
 
+    std.debug.print("before {any}\n", .{exe.linkage});
+    exe.pie = true;
+    exe.force_pic = true;
+    exe.verbose_link = true;
+    exe.linkage = std.build.LibExeObjStep.Linkage.dynamic;
+    std.debug.print("after {any}\n", .{exe.linkage});
+
+    // build & install
     exe.install();
 
     const run_cmd = exe.run();
