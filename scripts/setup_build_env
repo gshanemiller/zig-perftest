@@ -1,95 +1,10 @@
 #!/bin/bash
 
-# RUN THIS SCRIPT ON A FRESH EQUINIX ON-DEMAN INSTALL WITH MELLANOX NICS
-# THIS WILL INSTALL ALL DEPENDENT LIBRARIES, BUILD TOOLS, THEN BUILD THIS
-# SOURCE CODE
-
-export LD_LIBRARY_PATH=${D}/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
-export PKG_CONFIG_PATH=${D}/lib/x86_64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH}
-
 #
-# Install some of the prereqs
+# Install prereqs (works for Ubuntu 22.04 LTS)
 #
 apt update
 apt install --yes make numactl libnuma-dev rdma-core git ethtool htop libgtest-dev libgcc-10-dev gcc-10-doc cmake cmake-extras python3-pip ibverbs-providers ibverbs-utils libibverbs-dev libhugetlbfs0 zlib* ncat unzip zip gdb gdb-doc infiniband-diags libmnl-dev pkgconf* linux-tools-common linux-tools-5.15.0-58-generic libibumad-dev libpci-dev autoconf libtool librdmacm-dev linux-headers-5.15.0-58-generic dkms
-pip3 install --user meson pyelftools ninja gdown
-# apt upgrade --yes
-# where meson/ninja are installed
-export PATH=/root/.local/bin:${PATH}
 
 # install zig
 snap install zig --classic --edge
-
-# -----------------------------------------------------------
-# install MST tool set
-mkdir -p ~/Dev/tmp
-cd ~/Dev/tmp
-rm -rf *MFT*
-MFT="mft-4.23.0-104-x86_64-deb.tgz"
-MFT_CHECKSUM="13335ebec8e62bc7bdfb7ce55d897765587be8461c027f9f97a868eeaf8c8f56"
-wget https://www.mellanox.com/downloads/MFT/${MFT}
-ACTUAL_CHECKSUM=`sha256sum ./${MFT} | cut -d" " -f1`
-if [[ "$MFT_CHECKSUM" != "$ACTUAL_CHECKSUM" ]]
-then
-  echo "fatal: file: ${MFT}"
-  echo "fatal: actual          checksum: ${ACTUAL_CHECKSUM}"
-  echo "fatal: expected NVIDIA checksum: ${MFT_CHECKSUM}"
-  exit 1
-fi
-
-tar zxvf ${MFT}
-cd ${MFT%%.tgz}
-./install.sh --oem
-
-#
-# build zig-perftest
-#
-cd ~/Dev/zig-perftest
-zig build
-
-#
-# Add variables to ~/.bashrc
-#
-echo "export H=${HOME}/Dev" >> ${HOME}/.bashrc
-echo "export D=${HOME}/local" >> ${HOME}/.bashrc
-echo "export PATH=/root/.local/bin:${PATH}" >> ${HOME}/.bashrc
-echo "export LD_LIBRARY_PATH=${D}/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu" >> ${HOME}/.bashrc
-echo "export PKG_CONFIG_PATH=${D}/lib/x86_64-linux-gnu/pkgconfig" >> ${HOME}/.bashrc
-echo "alias ll=\"ls -la\"" >> ${HOME}/.bashrc
-echo "alias edit=\"vi\"" >> ${HOME}/.bashrc
-echo "alias ppjson=\"python3 -m json.tool\"" >> ${HOME}/.bashrc
-echo "alias zb=\"zig build\"" >> ${HOME}/.bashrc
-echo "alias zr=\"./zig-out/bin/zig-perftest -d rocep1s0f1 -B X8:c0:eb:d4:ec:07 -E X8:c0:eb:d4:ec:07 -j 192.168.0.2 -J 192.168.0.2\"" >> ${HOME}/.bashrc
-echo "alias zd=\"gdb --args ./zig-out/bin/zig-perftest -d rocep1s0f1 -B X8:c0:eb:d4:ec:07 -E X8:c0:eb:d4:ec:07 -j 192.168.0.2 -J 192.168.0.2\"" >> ${HOME}/.bashrc
-
-#
-# Add variables to .vimrc
-#
-echo "set expandtab" > ~/.vimrc
-echo "set tabstop=2" >> ~/.vimrc
-echo "set shiftwidth=2" >> ~/.vimrc
-echo "set bg=dark" >> ~/.vimrc
-echo "set noautoindent" >> ~/.vimrc
-echo "set nosmartindent" >> ~/.vimrc
-echo "set nocindent" >> ~/.vimrc
-echo "set wrap" >> ~/.vimrc
-echo ":syntax off" >> ~/.vimrc
-echo ":set colorcolumn=120" >> ~/.vimrc
-
-# git needs this
-git config --global user.email "gshanemiller6@gmail.com"
-git config --global user.name "smiller"
-
-# setup run env so can
-./scripts/setup_run_env
-mlxconfig -y -d /dev/mst/mt4119_pciconf0.1 set KEEP_IB_LINK_UP_P1=1 KEEP_IB_LINK_UP_P2=1
-
-#
-echo
-echo You need to fix /etc/network/interfaces per:
-echo https://github.com/gshanemiller/reinvent/blob/main/doc/equinix_mellanox_setup.md#procedure-part-2-of-3
-
-# 
-echo
-read -p "Press ENTER to reboot now or CTRL-C to exit: "
-reboot

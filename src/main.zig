@@ -209,21 +209,9 @@ pub fn parseCommandLine(allocator: std.mem.Allocator, param: *Param) i32 {
 }
 
 pub fn main() u8 {
-  var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-  defer arena.deinit();
-
-  var param = Param{};
-  if (0!=parseCommandLine(arena.allocator(), &param)) {
-    return 2;
-  }
-
-  param.print();
-
-  std.log.debug("binding to '{s}' ...\n", .{param.deviceId});
-
   var rc = ice.ice_ib_find_device();
   if (0!=rc) {
-    std.log.err("unable to bind to '{s}': code: {d}\n", .{param.deviceId, rc});
+    std.log.err("unable to bind: code: {d}\n", .{rc});
     return 1;
   }
 
