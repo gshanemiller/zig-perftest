@@ -221,12 +221,7 @@ pub fn main() u8 {
 
   std.log.debug("binding to '{s}' ...\n", .{param.deviceId});
 
-  // expected type '[*c][*c].root.Dev.zig-perftest.zig-cache.o.f1d4bc9687eea2bffffb5af13f4a023a.cimport.struct_ibv_device', 
-  // found               '**.root.Dev.zig-perftest.zig-cache.o.f1d4bc9687eea2bffffb5af13f4a023a.cimport.struct_ibv_device'
-  // pub extern fn ice_ib_find_device(deviceName: [*c]const u8, device: [*c][*c]struct_ibv_device) c_int;
-
-  var device: [*c]ice.ibv_device = 0;
-  var rc = ice.ice_ib_find_device(param.deviceId.ptr, &device);
+  var rc = ice.ice_ib_find_device();
   if (0!=rc) {
     std.log.err("unable to bind to '{s}': code: {d}\n", .{param.deviceId, rc});
     return 1;

@@ -18,7 +18,7 @@ pip3 install --user meson pyelftools ninja gdown
 export PATH=/root/.local/bin:${PATH}
 
 # install zig
-snap install zig --classic --beta
+snap install zig --classic --edge
 
 # -----------------------------------------------------------
 # install MST tool set
@@ -86,7 +86,7 @@ mlxconfig -y -d /dev/mst/mt4119_pciconf0.1 set KEEP_IB_LINK_UP_P1=1 KEEP_IB_LINK
 
 #
 echo
-echo You need to fix /etc/system/network as per:
+echo You need to fix /etc/network/interfaces per:
 echo https://github.com/gshanemiller/reinvent/blob/main/doc/equinix_mellanox_setup.md#procedure-part-2-of-3
 
 # 
