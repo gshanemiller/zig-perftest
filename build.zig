@@ -55,20 +55,19 @@ pub fn build(b: *std.Build) void {
 
     // And link in dependent IB libraries
     exe.linkSystemLibrary("m");
-//  exe.linkSystemLibrary("mlx5");
-//  exe.linkSystemLibrary("efa");
+    exe.linkSystemLibrary("mlx5");
+    exe.linkSystemLibrary("efa");
     exe.linkSystemLibrary("rdmacm");
     exe.linkSystemLibrary("ibverbs");
     exe.linkSystemLibrary("pci");
     exe.linkSystemLibrary("pthread");
     exe.linkSystemLibrary("nl-route-3");
     exe.linkSystemLibrary("nl-3");
-//  exe.linkSystemLibrary("udev");
 
-    exe.pie = true;
-    exe.force_pic = true;
-    exe.rdynamic = true;
-    exe.linkage = std.build.LibExeObjStep.Linkage.dynamic;
+    // exe.pie = true;
+    // exe.force_pic = true;
+    // exe.rdynamic = true;
+    // exe.linkage = std.build.LibExeObjStep.Linkage.dynamic;
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
