@@ -14,9 +14,10 @@ struct Param {
   int   txQueueSize;
   int   rxQueueSize;
   int   payloadSize;
-  int   ibPort;
+  int   ibPort;             // (some NICs are dual port)
   char  useHugePages;
   char  isServer;
+};
 
 // Return 0 if 
 ib_config_init_link_layer(const struct ibv_context *context, const struct Param *param);
