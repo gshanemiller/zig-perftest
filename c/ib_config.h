@@ -2,7 +2,7 @@
 
 #include <ib_common.h>
 
-const uint64_t HUGEPAGE_ALIGN_2MB = 0x200000;
+static const uint64_t HUGEPAGE_ALIGN_2MB = 0x200000;
 
 struct UserParam {
   uint8_t   deviceId[64];
