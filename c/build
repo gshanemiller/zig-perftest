@@ -1,9 +1,10 @@
 #!/bin/bash -x
 
-CC_OPTS="-D_GNU_SOURCE -g -O2 -Wall -march=native -std=c11 -I. -I/usr/include -I/usr/include/infiniband -I/usr/include/x86_64-linux-gnu"
+CC_OPTS="-D_GNU_SOURCE -g -O0 -Wall -march=native -std=c11 -I. -I/usr/include -I/usr/include/infiniband -I/usr/include/x86_64-linux-gnu"
 LD_OPTS="-L /usr/lib/x86_64-linux-gnu -lm -lmlx5 -lefa -lrdmacm -libverbs -lpci -lpthread -lnl-route-3 -lnl-3"
 
 gcc ${CC_OPTS} -c main.c      -o main.o
 gcc ${CC_OPTS} -c ib_device.c -o ib_device.o
 gcc ${CC_OPTS} -c ib_common.c -o ib_common.o
-gcc main.o ib_device.o ib_common.o -o ib ${LD_OPTS}
+gcc ${CC_OPTS} -c ib_config.c -o ib_config.o
+gcc main.o ib_config.o ib_device.o ib_common.o -o ib ${LD_OPTS}
