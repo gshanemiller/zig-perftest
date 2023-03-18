@@ -10,8 +10,6 @@ int main() {
 
   param.portId = 1;
   param.useHugePages = 1;
-  param.cycleBuffer = 4096;
-  param.cycleBufferSize = 8192;
 
   rc = ice_ib_find_device("rocep1s0f1", &device);
 

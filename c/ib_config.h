@@ -17,15 +17,13 @@ struct UserParam {
   uint32_t  rxQueueSize;
   uint32_t  payloadSize;
   uint32_t  portId;             // (some NICs are dual port. one-based)
-  uint32_t  cycleBuffer;
-  uint64_t  cycleBufferSize;
   uint8_t   useHugePages;
   uint8_t   isServer;
 };
 
 struct SessionParam {
-  const struct UserParam    *userParam;     // not owned
-  const struct ibv_context  *context        // not owned
+  const struct UserParam    *userParam;             // not owned
+  const struct ibv_context  *context;               // not owned
 
   struct ibv_qp             *qp;
   struct ibv_qp_ex          *qpExt;
@@ -33,7 +31,12 @@ struct SessionParam {
   struct ibv_mr             *mr;
   struct ibv_sge            *sge;
 
-  struct ibv_pd             *pd;            // memory protection domain
+  struct ibv_pd             *pd;                    // memory protection domain
+  uint32_t                  shmid;                  // for huge pages
+  void                      *hugePageMemory;        // pointer to allocated memory
+  uint32_t                  hugePageAlignSizeBytes; // to help calc memory alignment
+  uint64_t                  needHugePageSizeBytes;  // how much needed
+  uint64_t                  hugePageSizeBytes;      // actual amount allocated w/ alignment
 
   uint32_t                  dctn;
   uint32_t                  dciStreamId;

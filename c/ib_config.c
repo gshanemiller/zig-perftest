@@ -1,5 +1,9 @@
 #include <ib_config.h>
 
+#include <sys/mman.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
 int ice_ib_config_check_port_device(const struct ibv_context *context, int portId) {
   assert(context);
   assert(portId>0);
@@ -54,40 +58,47 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     valid = 0;
   }
 
-  if (0==(session->pd = ibv_alloc_pd(context))) {
+  if (0==(session->pd = ibv_alloc_pd((struct ibv_context *)context))) {
     valid = 0;
   }
 
-  param.cycleBuffer = 4096;                                                                                             
-  param.cycleBufferSize = 8192; 
-
   if (param->useHugePages) {
-        uint64_t buf_size;
-        uint64_t alignment = (((param->cycleBuffer + HUGEPAGE_ALIGN_2MB-1) / HUGEPAGE_ALIGN_2MB) * HUGEPAGE_ALIGN_2MB);
-        buf_size = (((param->cycleBufferSize + alignment -1 ) / alignment ) * alignment);
+    session->hugePageAlignSizeBytes = 4096;                                                                                             
+    session->needHugePageSizeBytes = 8192; 
 
-        /* create hugepage shared region */
-        ctx->huge_shmid = shmget(IPC_PRIVATE, buf_size,
-                                 SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
-        if (ctx->huge_shmid < 0) {
-                fprintf(stderr, "Failed to allocate hugepages. Please configure hugepages\n");
-                return FAILURE;
-        }
+    uint64_t buf_size;
+    uint64_t alignment = (((session->hugePageAlignSizeBytes +HUGEPAGE_ALIGN_2MB-1)/HUGEPAGE_ALIGN_2MB) * HUGEPAGE_ALIGN_2MB);
+    buf_size = (((session->needHugePageSizeBytes + alignment-1 ) / alignment ) * alignment);
 
-        /* attach shared memory */
-        ctx->buf[qp_index] = (void *) shmat(ctx->huge_shmid, SHMAT_ADDR, SHMAT_FLAGS);
-        if (ctx->buf == (void *) -1) {
-                fprintf(stderr, "Failed to attach shared memory region\n");
-                return FAILURE;
-        }
+    // create huge pages
+    session->shmid = shmget(IPC_PRIVATE, buf_size, SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
+    if (session->shmid < 0) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_allocate_session: cannot allocate %lu bytes of hugepage memory: %s (errno %d)\n",
+        buf_size, strerror(rc), rc);
+      valid = 0;
+    }
 
-        /* Mark shmem for removal */
-        if (shmctl(ctx->huge_shmid, IPC_RMID, 0) != 0) {
-                fprintf(stderr, "Failed to mark shm for removal\n");
-                return FAILURE;
-        }
+    // attach shared memory
+    session->hugePageMemory = (void *)shmat(session->shmid, 0, 0);
+    if (session->hugePageMemory==(void*)(-1)) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_allocate_session: cannot attach %lu bytes of hugepage memory: %s (errno %d)\n",
+        buf_size, strerror(rc), rc);
+      session->hugePageMemory = 0;
+      valid = 0;
+    }
 
-        return SUCCESS;
+    // Mark shmem for auto removal
+    if (shmctl(session->shmid, IPC_RMID, 0) != 0) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_allocate_session: hugepage memory cannot auto-delete: %s (errno %d)\n",
+        strerror(rc), rc);
+    }
+
+    // Initialize memory zero
+    memset(session->hugePageMemory, 0, buf_size);
+    session->hugePageSizeBytes = buf_size;
   }
 
   session->userParam = param;
