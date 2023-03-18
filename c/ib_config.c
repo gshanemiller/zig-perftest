@@ -58,11 +58,11 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     valid = 0;
   }
 
-  if (0==(session->pd = ibv_alloc_pd((struct ibv_context *)context))) {
-    valid = 0;
-  }
-
   if (param->useHugePages) {
+    if (0==(session->pd = ibv_alloc_pd((struct ibv_context *)context))) {
+      valid = 0;
+    }
+
     session->hugePageAlignSizeBytes = 4096;                                                                                             
     session->needHugePageSizeBytes = 8192; 
 
@@ -99,7 +99,21 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     // Initialize memory zero
     memset(session->hugePageMemory, 0, buf_size);
     session->hugePageSizeBytes = buf_size;
+
+    int flags = IBV_ACCESS_LOCAL_WRITE;
+    flags |= IBV_ACCESS_RELAXED_ORDERING;  // disable_pcir?
+ 
+    if (session->pd && session->hugePageMemory) {
+      session->mr = ibv_reg_mr(session->pd, session->hugePageMemory, session->hugePageSizeBytes, flags);
+      if (0==session->mr) {
+        int rc = errno;
+        fprintf(stderr, "warn : ice_ib_allocate_session: ibv_reg_mr failed: %s (errno %d)\n",
+          strerror(rc), rc);
+        valid = 0;
+      }
+    }
   }
+
 
   session->userParam = param;
   session->context = context;
