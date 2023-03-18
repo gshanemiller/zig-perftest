@@ -30,6 +30,8 @@ struct SessionParam {
   struct mlx5dv_qp_ex       *devQp;
   struct ibv_mr             *mr;
   struct ibv_sge            *sge;
+  struct ibv_cq             *send_cq;
+  struct ibv_cq             *recv_cq;
 
   struct ibv_pd             *pd;                    // memory protection domain
   uint32_t                  shmid;                  // for huge pages

@@ -114,6 +114,74 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     }
   }
 
+  if (0==(session->send_cq = ibv_create_cq((struct ibv_context *)context, param->txQueueSize, 0, 0, 0))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_cq failed: %s (errno %d)\n",
+      strerror(rc), rc);
+    valid = 0;
+  }
+
+  if (0==(session->recv_cq = ibv_create_cq((struct ibv_context *)context, param->rxQueueSize, 0, 0, 0))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_cq failed: %s (errno %d)\n",
+      strerror(rc), rc);
+    valid = 0;
+  }
+
+  if (session->send_cq && session->recv_cq && session->pd) {
+    struct ibv_qp_init_attr attr;
+    struct ibv_qp_init_attr_ex attrEx;
+    struct mlx5dv_qp_init_attr attrMlx5;
+
+    memset(&attr, 0, sizeof(attr));
+    memset(&attrEx, 0, sizeof(attrEx));
+    memset(&attrMlx5, 0, sizeof(attrMlx5));
+
+    attr.send_cq = session->send_cq;
+    attr.recv_cq = session->recv_cq;
+    attr.cap.max_send_wr = param->txQueueSize;
+    attr.cap.max_send_sge = 1;
+    attr.cap.max_recv_wr = param->rxQueueSize;
+    attr.cap.max_recv_sge = 1;
+    attr.qp_type |= IBV_QPT_RAW_PACKET;
+    attr.cap.max_inline_data = 0;
+
+    attrEx.pd = session->pd;
+    attrEx.send_ops_flags |= IBV_QP_EX_WITH_SEND;
+    attrEx.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
+    attrEx.send_cq = session->send_cq;
+    attrEx.recv_cq = session->recv_cq;
+    attrEx.cap.max_send_wr = attr.cap.max_send_wr;
+    attrEx.cap.max_send_sge = attr.cap.max_send_sge;
+    attrEx.cap.max_recv_wr  = attr.cap.max_recv_wr;
+    attrEx.cap.max_recv_sge = attr.cap.max_recv_sge;
+    attrEx.qp_type = attr.qp_type;
+    attrEx.srq = attr.srq;
+    attrEx.cap.max_inline_data = attr.cap.max_inline_data;
+
+    if (0==(session->qp = ibv_create_qp(session->pd, &attr))) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_qp failed: %s (errno %d)\n",
+        strerror(rc), rc);
+      valid = 0;
+    }
+
+    if (session->qp) {
+      struct ibv_qp_attr attr;
+      memset(&attr, 0, sizeof(attr));
+      int flags = IBV_QP_STATE | IBV_QP_PORT;
+
+      attr.qp_state = IBV_QPS_INIT;
+      attr.port_num = param->portId;
+      
+      if (0!=(ibv_modify_qp(session->qp, &attr, flags))) {
+        int rc = errno;
+        fprintf(stderr, "warn : ice_ib_allocate_session: ibv_modify_qp failed: %s (errno %d)\n",
+          strerror(rc), rc);
+        valid = 0;
+      }
+    }
+  }
 
   session->userParam = param;
   session->context = context;
@@ -124,9 +192,6 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
 int ice_ib_deallocate_session(struct SessionParam *session) {
   assert(session);
 
-  if (session->qp) {
-    free(session->qp);
-  }
   if (session->qpExt) {
     free(session->qpExt);
   }
@@ -141,6 +206,15 @@ int ice_ib_deallocate_session(struct SessionParam *session) {
   }
   if (session->pd) {
     ibv_dealloc_pd(session->pd);
+  }
+  if (session->send_cq) {
+    ibv_destroy_cq(session->send_cq);
+  }
+  if (session->recv_cq) {
+    ibv_destroy_cq(session->recv_cq);
+  }
+  if (session->qp) {
+    ibv_destroy_qp(session->qp);
   }
 
   memset(session, 0, sizeof(struct SessionParam));

@@ -3,13 +3,15 @@
 
 int main() {
   int rc;
-  struct UserParam param;
+  struct UserParam param = {0};
   struct SessionParam session;
   struct ibv_device *device = 0;
   struct ibv_context *context = 0;
 
   param.portId = 1;
   param.useHugePages = 1;
+  param.txQueueSize = 256;
+  param.rxQueueSize = 256;
 
   rc = ice_ib_find_device("rocep1s0f1", &device);
 
