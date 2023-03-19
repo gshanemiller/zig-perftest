@@ -19,6 +19,8 @@ int main() {
     rc = ice_ib_open_context(device, &context);
     rc = ice_ib_config_check_port_device(context, param.portId);
     rc = ice_ib_allocate_session(&param, context, &session);
+    rc = ice_ib_set_rtr(&session);
+    rc = ice_ib_set_rts(&session);
     rc = ice_ib_deallocate_session(&session);
     rc = ice_ib_close_context(context);
   }

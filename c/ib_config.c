@@ -277,9 +277,48 @@ int ice_ib_deallocate_session(struct SessionParam *session) {
   return 0;
 }
 
-int ice_ib_set_mtu(const struct ibv_context *context, int mtuSizeBytes, int portId) {
-  assert(context);
-  assert(mtuSizeBytes>0);
-  assert(portId>0);
-  return 0;
+int ice_ib_set_rtr(struct SessionParam *session) {
+  assert(session);
+
+  struct ibv_qp_attr attr;
+  memset(&attr, 0, sizeof(attr));
+
+  int flags = IBV_QP_STATE;
+
+  attr.qp_state = IBV_QPS_RTR;                                                                                         
+  attr.ah_attr.src_path_bits = 0;                                                                                      
+  attr.ah_attr.port_num = session->userParam->portId;
+
+  int rc = ibv_modify_qp(session->qp, &attr, flags);
+
+  if (rc!=0) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_set_rtr: ibv_modify_qp: failed: %s (errno %d)\n",
+      strerror(rc), rc);
+  }
+
+  return rc;
+}
+
+int ice_ib_set_rts(struct SessionParam *session) {
+  assert(session);
+
+  struct ibv_qp_attr attr;
+  memset(&attr, 0, sizeof(attr));
+
+  int flags = IBV_QP_STATE;
+
+  attr.qp_state = IBV_QPS_RTS;                                                                                         
+  attr.ah_attr.src_path_bits = 0;                                                                                      
+  attr.ah_attr.port_num = session->userParam->portId;
+
+  int rc = ibv_modify_qp(session->qp, &attr, flags);
+
+  if (rc!=0) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_set_rtr: ibv_modify_qp: failed: %s (errno %d)\n",
+      strerror(rc), rc);
+  }
+
+  return rc;
 }

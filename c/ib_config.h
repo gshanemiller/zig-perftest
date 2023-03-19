@@ -61,4 +61,5 @@ int ice_ib_config_check_port_device(const struct ibv_context *context, int portI
 int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_context *context, struct SessionParam *session); 
 int ice_ib_deallocate_session(struct SessionParam *session); 
 
-int ice_ib_set_mtu(const struct ibv_context *context, int mtuSizeBytes, int portId);
+int ice_ib_set_rtr(struct SessionParam *session);
+int ice_ib_set_rts(struct SessionParam *session);
