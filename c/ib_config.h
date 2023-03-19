@@ -2,16 +2,16 @@
 
 #include <ib_common.h>
 
-static const uint64_t CPU_CACHE_SIZE = 64;                                                                                     
 static const uint64_t HUGEPAGE_ALIGN_2MB = 0x200000;
+static const uint64_t CPU_CACHE_LINE_SIZE_BYTES = 64;
 
 struct UserParam {
-  uint8_t   deviceId[64];
-  uint8_t   clientMac[64];
-  uint8_t   clientIpAddr[64];
+  char      deviceId[64];
+  char      clientMac[64];
+  char      serverMac[64];
+  char      clientIpAddr[64];
+  char      serverIpAddr[64];
   uint16_t  clientPort;
-  uint8_t   serverMac[64];
-  uint8_t   serverIpAddr[64];
   uint16_t  serverPort;
   uint32_t  iters;
   uint32_t  txQueueSize;
@@ -31,7 +31,7 @@ struct SessionParam {
   uint32_t                  serverIpAddr;           // server IPV4 address (192.16.0.2) in network binary format
   uint32_t                  clientIpAddr;           // server IPV4 address (192.16.0.2) in network binary format
   uint16_t                  serverPort;             // server IPV4 port in network binary format
-  uint16_t                  serverPort;             // client IPV4 port in network binary format
+  uint16_t                  clientPort;             // client IPV4 port in network binary format
 
   struct ibv_qp             *qp;
   struct ibv_qp_ex          *qpExt;
@@ -48,7 +48,7 @@ struct SessionParam {
   uint64_t                  hugePageSizeBytes;      // actual amount allocated w/ alignment
   uint32_t                  shmid;                  // for huge pages
   uint8_t                   *currentPacket;         // current packet (see ice_ib_make_ipv4packet)
-  uint8_t                   *nextPacket;            // where next packet will be created (ice_ib_make_ipv4packet);
+  uint8_t                   *nextPacket;            // where next packet will be created (see ice_ib_make_ipv4packet);
 
   uint32_t                  dctn;
   uint32_t                  dciStreamId;

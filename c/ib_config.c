@@ -39,13 +39,13 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
   memset(session, 0, sizeof(struct SessionParam));
 
   // Get source/dest IPV4 IP addresses into network ready binary format
-  if (0=(inet_pton(AF_INET, param->serverIpAddr, &session->serverIpAddr))) {
+  if (0==(inet_pton(AF_INET, param->serverIpAddr, &session->serverIpAddr))) {
     int rc = errno;
     fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->serverIpAddr,
       strerror(rc), rc);
     valid = 0;
   }
-  if (0=(inet_pton(AF_INET, param->clientIpAddr, &session->clientIpAddr))) {
+  if (0==(inet_pton(AF_INET, param->clientIpAddr, &session->clientIpAddr))) {
     int rc = errno;
     fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->clientIpAddr,
       strerror(rc), rc);
@@ -53,21 +53,30 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
   }
 
   // Get source/dest IP MAC addreses into network ready binary format
+  uint32_t macData[6];
   if (6!=(sscanf(param->serverMac, "%02x:%02x:%02x:%02x:%02x:%02x",
-    serverMacAddr+0, serverMacAddr+1, serverMacAddr+2,
-    serverMacAddr+3, serverMacAddr+4, serverMacAddr+5))) {
+    macData+0, macData+1, macData+2,
+    macData+3, macData+4, macData+5))) {
     int rc = errno;
     fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
       param->serverMac, strerror(rc), rc);
     valid = 0;
   }
+  for (uint16_t i=0; i<6; ++i) {
+    session->serverMac[i] = (uint8_t)(macData[i] & 0xff);
+  }
+
+  // Get source/dest IP MAC addreses into network ready binary format
   if (6!=(sscanf(param->clientMac, "%02x:%02x:%02x:%02x:%02x:%02x",
-    clientMacAddr+0, clientMacAddr+1, clientMacAddr+2,
-    clientMacAddr+3, clientMacAddr+4, clientMacAddr+5))) {
+    macData+0, macData+1, macData+2,
+    macData+3, macData+4, macData+5))) {
     int rc = errno;
     fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
       param->clientMac, strerror(rc), rc);
     valid = 0;
+  }
+  for (uint16_t i=0; i<6; ++i) {
+    session->serverMac[i] = (uint8_t)(macData[i] & 0xff);
   }
 
   // Get source/dest IPV4 IP ports into network ready binary format
@@ -133,7 +142,7 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     // the next packet will be allocated from here
     session->currentPacket = session->nextPacket = (uint8_t*)(session->hugePageMemory);
     // Make sure it's on a CP cache boundary
-    assert(((uint64_t)(session->currentPacket) % CPU_CACHE_SIZE)==0);
+    assert(((uint64_t)(session->currentPacket) % CPU_CACHE_LINE_SIZE_BYTES)==0);
 
     // Mark shmem for auto removal
     if (shmctl(session->shmid, IPC_RMID, 0) != 0) {

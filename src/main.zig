@@ -45,7 +45,7 @@ const Param = struct {
 };
 
 pub fn usageAndExit(param: *Param) void {
-  std.debug.print("Benchmark IPV4 UDP packets over userspace verbs API.\n\n", .{});Z
+  std.debug.print("Benchmark IPV4 UDP packets over userspace verbs API.\n\n", .{});
   std.debug.print("usage: perftest ...options...\n\n", .{});
   std.debug.print("-d <string>      required: infiniband device name from 'ibstats'\n", .{});
   std.debug.print("-B <string>      required: client ethernet MAC address (ex. 08:c0:eb:d4:ec:07)\n", .{});
