@@ -1,5 +1,6 @@
 #include <ib_config.h>
 
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -36,6 +37,47 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
   // Initialize session
   int valid = 1;
   memset(session, 0, sizeof(struct SessionParam));
+
+  // Get source/dest IPV4 IP addresses into network ready binary format
+  if (0=(inet_pton(AF_INET, param->serverIpAddr, &session->serverIpAddr))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->serverIpAddr,
+      strerror(rc), rc);
+    valid = 0;
+  }
+  if (0=(inet_pton(AF_INET, param->clientIpAddr, &session->clientIpAddr))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->clientIpAddr,
+      strerror(rc), rc);
+    valid = 0;
+  }
+
+  // Get source/dest IP MAC addreses into network ready binary format
+  if (6!=(sscanf(param->serverMac, "%02x:%02x:%02x:%02x:%02x:%02x",
+    serverMacAddr+0, serverMacAddr+1, serverMacAddr+2,
+    serverMacAddr+3, serverMacAddr+4, serverMacAddr+5))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
+      param->serverMac, strerror(rc), rc);
+    valid = 0;
+  }
+  if (6!=(sscanf(param->clientMac, "%02x:%02x:%02x:%02x:%02x:%02x",
+    clientMacAddr+0, clientMacAddr+1, clientMacAddr+2,
+    clientMacAddr+3, clientMacAddr+4, clientMacAddr+5))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
+      param->clientMac, strerror(rc), rc);
+    valid = 0;
+  }
+
+  // Get source/dest IPV4 IP ports into network ready binary format
+  session->serverPort = htons(param->serverPort);
+  session->clientPort = htons(param->clientPort);
+
+  // No point continuing if addresses bad
+  if (!valid) {
+    return ICE_IB_ERROR_BAD_IP_ADDR;
+  }
 
   // Allocate memory
   if (0==(session->qp = (struct ibv_qp *)malloc(sizeof(struct ibv_qp)))) {
@@ -88,6 +130,10 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
       session->hugePageMemory = 0;
       valid = 0;
     }
+    // the next packet will be allocated from here
+    session->currentPacket = session->nextPacket = (uint8_t*)(session->hugePageMemory);
+    // Make sure it's on a CP cache boundary
+    assert(((uint64_t)(session->currentPacket) % CPU_CACHE_SIZE)==0);
 
     // Mark shmem for auto removal
     if (shmctl(session->shmid, IPC_RMID, 0) != 0) {

@@ -2,20 +2,21 @@
 
 #include <ib_common.h>
 
+static const uint64_t CPU_CACHE_SIZE = 64;                                                                                     
 static const uint64_t HUGEPAGE_ALIGN_2MB = 0x200000;
 
 struct UserParam {
   uint8_t   deviceId[64];
   uint8_t   clientMac[64];
-  uint8_t   clientIp[64];
-  uint32_t  clientPort;
+  uint8_t   clientIpAddr[64];
+  uint16_t  clientPort;
   uint8_t   serverMac[64];
-  uint8_t   serverIp[64];
-  uint32_t  serverPort;
+  uint8_t   serverIpAddr[64];
+  uint16_t  serverPort;
   uint32_t  iters;
   uint32_t  txQueueSize;
   uint32_t  rxQueueSize;
-  uint32_t  payloadSize;
+  uint16_t  payloadSize;
   uint32_t  portId;             // (some NICs are dual port. one-based)
   uint8_t   useHugePages;
   uint8_t   isServer;
@@ -25,6 +26,13 @@ struct SessionParam {
   const struct UserParam    *userParam;             // not owned
   const struct ibv_context  *context;               // not owned
 
+  uint8_t                   serverMac[6];           // server MAC address in network binary format
+  uint8_t                   clientMac[6];           // server MAC address in network binary format
+  uint32_t                  serverIpAddr;           // server IPV4 address (192.16.0.2) in network binary format
+  uint32_t                  clientIpAddr;           // server IPV4 address (192.16.0.2) in network binary format
+  uint16_t                  serverPort;             // server IPV4 port in network binary format
+  uint16_t                  serverPort;             // client IPV4 port in network binary format
+
   struct ibv_qp             *qp;
   struct ibv_qp_ex          *qpExt;
   struct mlx5dv_qp_ex       *devQp;
@@ -32,13 +40,15 @@ struct SessionParam {
   struct ibv_sge            *sge;
   struct ibv_cq             *send_cq;
   struct ibv_cq             *recv_cq;
-
   struct ibv_pd             *pd;                    // memory protection domain
-  uint32_t                  shmid;                  // for huge pages
+
   void                      *hugePageMemory;        // pointer to allocated memory
   uint32_t                  hugePageAlignSizeBytes; // to help calc memory alignment
   uint64_t                  needHugePageSizeBytes;  // how much needed
   uint64_t                  hugePageSizeBytes;      // actual amount allocated w/ alignment
+  uint32_t                  shmid;                  // for huge pages
+  uint8_t                   *currentPacket;         // current packet (see ice_ib_make_ipv4packet)
+  uint8_t                   *nextPacket;            // where next packet will be created (ice_ib_make_ipv4packet);
 
   uint32_t                  dctn;
   uint32_t                  dciStreamId;
