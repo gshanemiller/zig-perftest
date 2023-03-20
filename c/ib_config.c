@@ -259,9 +259,6 @@ int ice_ib_deallocate_session(struct SessionParam *session) {
   if (session->sge) {
     free(session->sge);
   }
-  if (session->pd) {
-    ibv_dealloc_pd(session->pd);
-  }
   if (session->send_cq) {
     ibv_destroy_cq(session->send_cq);
   }
@@ -270,6 +267,12 @@ int ice_ib_deallocate_session(struct SessionParam *session) {
   }
   if (session->qp) {
     ibv_destroy_qp(session->qp);
+  }
+  if (session->mr) {
+      ibv_dereg_mr(session->mr);
+  }
+  if (session->pd) {
+    ibv_dealloc_pd(session->pd);
   }
 
   memset(session, 0, sizeof(struct SessionParam));

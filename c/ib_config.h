@@ -42,6 +42,20 @@ struct SessionParam {
   struct ibv_cq             *recv_cq;
   struct ibv_pd             *pd;                    // memory protection domain
 
+https://www.rdmamojo.com/2012/05/05/qp-state-machine/
+https://www.cs.mtsu.edu/~waderholdt/6430/papers/ibverbs.pdf
+struct ibv_comp_channel *ibv_create_comp_channel(struct ibv_context *context);
+struct ibv_comp_channel *ibv_create_comp_channel(struct ibv_context *context);
+hannel = ibv_create_comp_channel(context);
+if (!channel) {
+fprintf(stderr, "Error, ibv_create_comp_channel() failed\n");
+return -1;
+}
+if (ibv_destroy_comp_channel(channel)) {
+fprintf(stderr, "Error, ibv_destroy_comp_channel() failed\n");
+return -1;
+}
+
   void                      *hugePageMemory;        // pointer to allocated memory
   uint32_t                  hugePageAlignSizeBytes; // to help calc memory alignment
   uint64_t                  needHugePageSizeBytes;  // how much needed
