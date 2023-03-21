@@ -75,10 +75,11 @@ int ice_ib_allocate_huge_memory(uint64_t requestSizeBytes, struct HugePageMemory
 
 int ice_ib_initialize_ipv4_udp_queue(const struct UserParam *param, struct ibv_context *context, 
   const HugePageMemory *memory);
-int ice_ib_deinitialize_ipv4_udp_queue(HugePageMemory *memory);
+int ice_ib_deinitialize_ipv4_udp_queue(struct IPV4UDPQueue *queue);
 
-int ice_ib_initialize_session_common(struct SessionCommon *common);
-int ice_ib_deinitalizedsession_common(struct SessionCommon *common);
+int ice_ib_initialize_session_common(const struct UserParam *param, const struct IPV4UDPQueue *send,
+  const struct IPV4UDPQueue *recv, struct HugePageMemory *memory);
+int ice_ib_deinitalize_session_common(struct SessionCommon *common);
 
 int ice_ib_allocate_session(const struct UserParam *param, struct ibv_context *context, struct Session *session); 
 int ice_ib_deallocate_session(struct Session *session); 

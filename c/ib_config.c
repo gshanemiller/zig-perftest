@@ -97,6 +97,7 @@ int ice_ib_initialize_ipv4_udp_queue(int completionQueueSize, struct ibv_context
   queue->start = (const char *)memory->hugePageMemory;
   queue->end = (const char *)(start + memory->actualSizeBytes);
 
+  // Assume will succeed
   char valid = 1;
 
   // Allocate memory protection domain
@@ -119,6 +120,7 @@ int ice_ib_initialize_ipv4_udp_queue(int completionQueueSize, struct ibv_context
       fprintf(stderr, "warn : ice_ib_initialize_ipv4_udp_queue: ibv_reg_mr failed: %s (errno %d)\n",
         strerror(rc), rc);
       valid = 0;
+    }
   }
 
   // Allocate a completion queue
@@ -132,79 +134,66 @@ int ice_ib_initialize_ipv4_udp_queue(int completionQueueSize, struct ibv_context
   return valid ? 0 : ICE_IB_ERROR_API_ERROR;
 }
 
-int ice_ib_deinitialize_ipv4_udp_queue(HugePageMemory *memory) {
-  assert(memory);
+int ice_ib_deinitialize_ipv4_udp_queue(struct IPV4UDPQueue *queue) {
+  if (queue->cq) {
+    ibv_destroy_cq(queue->cq);
+  }
+  if (queue->mr) {
+    ibv_dereg_mr(queue->mr);
+  }
+  if (session->pd) {
+    ibv_dealloc_pd(queue->pd);
+  }
+
+  memset(queue, 0, sizeof(struct IPV4UDPQueue));
+
+  return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_context *context, struct Session *session) {
+int ice_ib_initialize_session_common(const struct UserParam *param, const struct IPV4UDPQueue *send,
+  const struct IPV4UDPQueue *recv, struct HugePageMemory *memory) {
   assert(param);
-  assert(context);
-  assert(session);
+  assert(memory);
 
-  // Initialize session
-  memset(session, 0, sizeof(struct Session));
+  // Huge page memory is to for a SessionCommon object
+  struct SessionCommon *queue = (struct SessionCommon *)memory->hugePageMemory;
 
-  // Start initializing session
-  char valid = 1;
-  session->userParam = param;
-  session->context = context;
+  if (send->cq && recv->cq) {
+    struct ibv_qp_init_attr attr;
+    memset(&attr, 0, sizeof(attr));
+
+    attr.send_cq = send->cq;
+    attr.recv_cq = recv->cq;
+    attr.cap.max_send_wr = param->txQueueSize;
+    attr.cap.max_send_sge = 1;
+    attr.cap.max_recv_wr = param->rxQueueSize;
+    attr.cap.max_recv_sge = 1;
+    attr.qp_type |= IBV_QPT_RAW_PACKET;
+    attr.cap.max_inline_data = 0;
+
+    if (0==(session->qp = ibv_create_qp(session->pd, &attr))) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_qp failed: %s (errno %d)\n",
+        strerror(rc), rc);
+      valid = 0;
+    }
+
+    if (session->qp) {
+      struct ibv_qp_attr attr;
+      memset(&attr, 0, sizeof(attr));
+      int flags = IBV_QP_STATE | IBV_QP_PORT;
+
+      attr.qp_state = IBV_QPS_INIT;
+      attr.port_num = param->portId;
+      
+      if (0!=(ibv_modify_qp(session->qp, &attr, flags))) {
+        int rc = errno;
+        fprintf(stderr, "warn : ice_ib_allocate_session: ibv_modify_qp failed: %s (errno %d)\n",
+          strerror(rc), rc);
+        valid = 0;
+      }
+    }
+  }
 
   // Get source/dest IPV4 IP addresses into network ready binary format
   if (0==(inet_pton(AF_INET, param->clientIpAddr, &session->srcIpAddr))) {
@@ -249,143 +238,63 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
   session->common->srcPort = htons(param->clientPort);
   session->common->dstPort = htons(param->serverPort);
 
-  // No point continuing if addresses bad
-  if (!valid) {
-    return ICE_IB_ERROR_BAD_IP_ADDR;
+  return 0;
+}
+
+int ice_ib_deinitalize_session_common(struct SessionCommon *common) {
+  assert(common);
+
+  if (common->qp) {
+    ibv_destroy_qp(common->qp);
   }
 
-  // Get memory for send queue
-  if (0!=(ice_ib_allocate_huge_memory(sizeof(IPV4UDPQueue), &session->sendMemory))) {
-    return ICE_IB_ERROR_NO_MEMORY;
-  }
-  session->send = (struct IPV4UDPQueue *)(session->sendMemory.hugePageMemory);
+  memset(common, 0, sizeof(struct SessionCommon));
 
-  // Get memory for recv queue
-  if (0!=(ice_ib_allocate_huge_memory(sizeof(IPV4UDPQueue), &session->recvMemory))) {
-    return ICE_IB_ERROR_NO_MEMORY;
-  }
-  session->recv = (struct IPV4UDPQueue *)(session->recvMemory.hugePageMemory);
+  return 0;
+}
 
-  // Get memory for common data
-  if (0!=(ice_ib_allocate_huge_memory(sizeof(SessionCommon), &session->cmmnMemory))) {
-    return ICE_IB_ERROR_NO_MEMORY;
-  }
-  session->common = (struct SessionCommon *)(session->cmmnMemory.hugePageMemory);
+int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_context *context, struct Session *session) {
+  assert(param);
+  assert(context);
+  assert(session);
+
+  // Initialize session
+  memset(session, 0, sizeof(struct Session));
+
+  // Start initializing session
+  char valid = 1;
+  session->userParam = param;
+  session->context = context;
 
   // Initialize send queue
-  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->sendMemory);
-
-  // Initialize recv queue
-  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->recvMemory);
-
-  // Initialize data common to send receive
-  if (0!=(ice_ib_initialize_session_common(&session->commonMemory);
-
-
-
-
-
-
-
-
-
-
-  if (0==(session->recv_cq = ibv_create_cq((struct ibv_context *)context, param->rxQueueSize, 0, 0, 0))) {
-    int rc = errno;
-    fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_cq failed: %s (errno %d)\n",
-      strerror(rc), rc);
+  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->sendMemory))) {
     valid = 0;
   }
 
-  if (session->send_cq && session->recv_cq && session->pd) {
-    struct ibv_qp_init_attr attr;
-    struct ibv_qp_init_attr_ex attrEx;
-    struct mlx5dv_qp_init_attr attrMlx5;
-
-    memset(&attr, 0, sizeof(attr));
-    memset(&attrEx, 0, sizeof(attrEx));
-    memset(&attrMlx5, 0, sizeof(attrMlx5));
-
-    attr.send_cq = session->send_cq;
-    attr.recv_cq = session->recv_cq;
-    attr.cap.max_send_wr = param->txQueueSize;
-    attr.cap.max_send_sge = 1;
-    attr.cap.max_recv_wr = param->rxQueueSize;
-    attr.cap.max_recv_sge = 1;
-    attr.qp_type |= IBV_QPT_RAW_PACKET;
-    attr.cap.max_inline_data = 0;
-
-    attrEx.pd = session->pd;
-    attrEx.send_ops_flags |= IBV_QP_EX_WITH_SEND;
-    attrEx.comp_mask |= IBV_QP_INIT_ATTR_SEND_OPS_FLAGS | IBV_QP_INIT_ATTR_PD;
-    attrEx.send_cq = session->send_cq;
-    attrEx.recv_cq = session->recv_cq;
-    attrEx.cap.max_send_wr = attr.cap.max_send_wr;
-    attrEx.cap.max_send_sge = attr.cap.max_send_sge;
-    attrEx.cap.max_recv_wr  = attr.cap.max_recv_wr;
-    attrEx.cap.max_recv_sge = attr.cap.max_recv_sge;
-    attrEx.qp_type = attr.qp_type;
-    attrEx.srq = attr.srq;
-    attrEx.cap.max_inline_data = attr.cap.max_inline_data;
-
-    if (0==(session->qp = ibv_create_qp(session->pd, &attr))) {
-      int rc = errno;
-      fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_qp failed: %s (errno %d)\n",
-        strerror(rc), rc);
-      valid = 0;
-    }
-
-    if (session->qp) {
-      struct ibv_qp_attr attr;
-      memset(&attr, 0, sizeof(attr));
-      int flags = IBV_QP_STATE | IBV_QP_PORT;
-
-      attr.qp_state = IBV_QPS_INIT;
-      attr.port_num = param->portId;
-      
-      if (0!=(ibv_modify_qp(session->qp, &attr, flags))) {
-        int rc = errno;
-        fprintf(stderr, "warn : ice_ib_allocate_session: ibv_modify_qp failed: %s (errno %d)\n",
-          strerror(rc), rc);
-        valid = 0;
-      }
-    }
+  // Initialize recv queue
+  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->recvMemory))) {
+    valid = 0;
   }
 
+  // Initialize data common to send receive
+  if (0!=(ice_ib_initialize_session_common(&session->commonMemory))) {
+    valid = 0;
+  }
 
-  return valid ? 0 : ICE_IB_ERROR_NO_MEMORY;
+  // Setup conveneince strongly-typed pointers into huge page memory
+  session->send = (struct IPV4UDPQueue *)(session->sendMemory.hugePageMemory);
+  session->recv = (struct IPV4UDPQueue *)(session->recvMemory.hugePageMemory);
+  session->common = (struct SessionCommon *)(session->cmmnMemory.hugePageMemory);
+
+  return valid ? 0 : ICE_IB_ERROR_API_ERROR;
 }
 
 int ice_ib_deallocate_session(struct Session *session) {
   assert(session);
 
-  if (session->qpExt) {
-    free(session->qpExt);
-  }
-  if (session->devQp) {
-    free(session->devQp);
-  }
-  if (session->mr) {
-    free(session->mr);
-  }
-  if (session->sge) {
-    free(session->sge);
-  }
-  if (session->send_cq) {
-    ibv_destroy_cq(session->send_cq);
-  }
-  if (session->recv_cq) {
-    ibv_destroy_cq(session->recv_cq);
-  }
-  if (session->qp) {
-    ibv_destroy_qp(session->qp);
-  }
-  if (session->mr) {
-      ibv_dereg_mr(session->mr);
-  }
-  if (session->pd) {
-    ibv_dealloc_pd(session->pd);
-  }
+  ice_ib_deinitalizedsession_common(session->common);
+  ice_ib_deinitialize_ipv4_udp_queue(session->send);
+  ice_ib_deinitialize_ipv4_udp_queue(session->recv);
 
   memset(session, 0, sizeof(struct Session));
 
