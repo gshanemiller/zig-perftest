@@ -18,13 +18,13 @@ int main() {
   param.isServer = 0;
 
   struct Session session;
-  if (0!=(rc = ice_ib_allocate_session(&param, &session))) {
-    ice_ib_set_rtr(&session);
-    ice_ib_set_rts(&session);
+  if (0!=(rc=ice_verb_allocate_session(&param, &session))) {
+    ice_verb_set_rtr(&session);
+    ice_verb_set_rts(&session);
   }
 
   // Free whatever was allocated
-  ice_ib_deallocate_session(&session);
+  ice_verb_deallocate_session(&session);
 
-  return rc==0;
+  return rc;
 }

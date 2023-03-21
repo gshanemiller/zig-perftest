@@ -1,31 +1,28 @@
 #include <ib_ethernet.h>
 
-int ice_ib_make_ipv4packet(const struct *session, const char *payload, uint16_t payloadSizeBytes) {
-  assert(session);
+int ice_ib_make_ipv4packet(struct Queue *queue, uint16_t payloadSizeBytes) {
+  assert(queue);
   assert(payload);
   assert(payloadSizeBytes>0);
-  assert(payloadSizeBytes==session->userParam->payloadSize);
 
-  // Make this packet at next offset in hugepage memory
-  uint64_t offset(0);
-  char *packet = session->nextPacket; 
+  // Make this packet at next free offset in [start, end)
+  char *packet = 0;
 
   // Find the start of future next packet (the one made on next call to
   // ice_ib_make_ipv4packet) and make sure it's on a on CPU_CACHE_SIZE boundary
-  char *nextPacket = packet + sizeof(IPV4Packet) + payloadSizeBytes;
-  char *offset = nextPacket & 0x3F;
-  if (offset!=0) {
-    nextPacket += (CPU_CACHE_LINE_SIZE_BYTES-offset);
+  uint64_t offset = (uint64_t)packet + sizeof(struct IPV4Packet) + payloadSizeBytes;
+  if (offset & CPU_CACHE_LINE_SIZE_MASK) {
+    offset += CPU_CACHE_LINE_SIZE_BYTES - (offset & CPU_CACHE_LINE_SIZE_MASK);
   }
-  assert(nextPacket>packet);
-  assert(((uint64_t)(nextPacket) % CPU_CACHE_LINE_SIZE_BYTES)==0);
+  assert((nextPacket % CPU_CACHE_LINE_SIZE_BYTES)==0);
   
   // OK initialize 
+  char *nextPacket = packet + offset;
   struct IPV4Packet *packetObj = (struct IPV4Packet *)packet;
 
   // IP header
-  memcpy(packetObj->ip_header.dstMac, session->serverMac, sizeof(packetObj->ip_header.dstMac));
-  memcpy(packetObj->ip_header.srcMac, session->clientMac, sizeof(packetObj->ip_header.srcMac));
+  memcpy(packetObj->ip_header.dstMac, queue->dstMac, sizeof(packetObj->ip_header.dstMac));
+  memcpy(packetObj->ip_header.srcMac, queue->srcMac, sizeof(packetObj->ip_header.srcMac));
   packetObj->ip_header.ethType = 2048;                        // Ethernet
 
   // IPV4 header
@@ -38,12 +35,12 @@ int ice_ib_make_ipv4packet(const struct *session, const char *payload, uint16_t 
   packetObj->ipv4_header.ttl = 64;
   packetObj->ipv4_header.nextProtoId = 0x200;                 // next packet will also be IPV4 UDP (and not fragment)
   packetObj->ipv4_header.checksum = 0;                        // checksum: calc'd below
-  packetObj->ipv4_header.srcIpAddr = session->clientIpAddr;
-  packetObj->ipv4_header.dstIpAddr = session->serverIpAddr;
+  packetObj->ipv4_header.srcIpAddr = common->srcIpAddr;
+  packetObj->ipv4_header.dstIpAddr = common->dstIpAddr;
 
   // UDP header
-  packetObj->ipv4udp_header.srcPort = session->clientPort;
-  packetObj->ipv4udp_header.dstPort = session->serverPort;
+  packetObj->ipv4udp_header.srcPort = common->srcPort;
+  packetObj->ipv4udp_header.dstPort = common->dstPort;
   packetObj->ipv4udp_header.size = 0;                         // sizeof header & everything that follows
   packetObj->ipv4udp_header.checkum = 0;                      // optional checksum on UDP data; leaving 0
 
@@ -68,10 +65,6 @@ int ice_ib_make_ipv4packet(const struct *session, const char *payload, uint16_t 
 
   // Copy-in in payload
   memcpy(packetObj->payload, payload, payloadSizeBytes);
-
-  // Now update pointers in session
-  session->packet = packet;
-  session->nextPacket = nextPacket; 
 
   return 0;
 }

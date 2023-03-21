@@ -1,9 +1,6 @@
 #pragma once
 
-#include <ib_session.h>
-
-static const uint64_t UDP_HEADER_SIZE_BYTES  = 0;
-static const uint16_t IPV4_HEADER_SIZE_BYTES = 0;
+#include <ib_config.h>
 
 #pragma pack(push,1)
 struct IPHeader {
@@ -42,4 +39,4 @@ struct IPV4Packet {
 };
 #pragma pack(pop)
 
-int ice_ib_make_ipv4packet(const struct *session, const char *payload, uint16_t payloadSizeBytes);
+int ice_ib_make_ipv4packet(struct SessionCommon *common, struct Queue *queue, uint16_t payloadSizeBytes);
