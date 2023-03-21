@@ -4,7 +4,7 @@ mst start
 mst status -v
 
 # add some 2048Kb hugepages
-sudo sysctl -w vm.nr_hugepages=102400
+sudo sysctl -w vm.nr_hugepages=100
 
 # just in case, load modules needed
 modprobe -a ib_uverbs mlx5_core mlx5_ib
