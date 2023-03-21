@@ -1,4 +1,4 @@
-#include <ib_config.h>
+#include <ice_verb.h>
 
 int main() {
   int rc;

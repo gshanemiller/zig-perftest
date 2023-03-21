@@ -4,5 +4,5 @@ CC_OPTS="-D_GNU_SOURCE -g -O0 -Wall -march=native -std=c2x -I. -I/usr/include -I
 LD_OPTS="-L /usr/lib/x86_64-linux-gnu -lm -lmlx5 -lefa -lrdmacm -libverbs -lpci -lpthread -lnl-route-3 -lnl-3"
 
 gcc ${CC_OPTS} -c main.c -o main.o
-gcc ${CC_OPTS} -c ib_config.c -o ib_config.o
-gcc main.o ib_config.o -o ib ${LD_OPTS}
+gcc ${CC_OPTS} -c ice_verb.c -o ice_verb.o
+gcc main.o ice_verb.o -o ib ${LD_OPTS}
