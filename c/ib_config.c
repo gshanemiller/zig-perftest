@@ -29,45 +29,200 @@ int ice_ib_config_check_port_device(const struct ibv_context *context, int portI
   return 0;
 }
 
-int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_context *context, struct SessionParam *session) {
+int ice_ib_allocate_huge_memory(uint64_t requestSizeBytes, struct HugePageMemory *memory) {
+  assert(requestSize>0);
+  assert(memory!=0);
+  
+  // Round request size to nearest 2MB
+  uint64_t buf_size = requestSizeBytes;
+  if (buf_size<HUGEPAGE_ALIGN_2MB) {
+    buf_size = HUGEPAGE_ALIGN_2MB;
+  } else if ((buf_size%HUGEPAGE_ALIGN_2MB)!=0) {
+    uint64_t buf_remainder = buf_size & (HUGEPAGE_ALIGN_2MB-1);
+    buf_size += (HUGEPAGE_ALIGN_2MB-buf_remainder);
+  }
+  assert((buf_size%HUGEPAGE_ALIGN_2MB)==0);
+
+  // Request request v. actual memory ask
+  memory->requestSizeBytes = requestSizeBytes;
+  memory->actualSizeBytes = buf_size;
+
+  fprintf(stderr, "info : ice_ib_allocate_huge_memory: requested %lu bytes rounded to %lu bytes\n",
+    requestSizeBytes, buf_size);
+    
+  // create 2MB huge pages with read/write permissions
+  memory->shmid = shmget(IPC_PRIVATE, buf_size, SHM_HUGETLB | SHM_HUGE_2MB | IPC_CREAT | SHM_R | SHM_W);
+  if (memory->shmid < 0) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_huge_memory: cannot allocate %lu bytes of hugepage memory: %s (errno %d)\n",
+      buf_size, strerror(rc), rc);
+    assert(rc!=0);
+    return rc;
+  }
+
+  // attach shared memory
+  memory->hugePageMemory = (void *)shmat(memory->shmid, 0, 0);
+  if (memory->hugePageMemory==(void*)(-1)) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_huge_memory: cannot attach %lu bytes of hugepage memory: %s (errno %d)\n",
+      buf_size, strerror(rc), rc);
+    memory->hugePageMemory = 0;
+    assert(rc!=0);
+    return rc;
+  }
+
+  // Mark shmem for auto removal when pid exits
+  if (shmctl(memory->shmid, IPC_RMID, 0) != 0) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: hugepage memory cannot auto-delete: %s (errno %d)\n",
+      strerror(rc), rc);
+  }
+
+  // Initialize memory zero
+  memset(memory->hugePageMemory, 0, buf_size);
+
+  return 0;
+}
+
+int ice_ib_initialize_ipv4_udp_queue(int completionQueueSize, struct ibv_context *context,
+  const HugePageMemory *memory) {
+  assert(completionQueueSize>0);
+  assert(context);
+  assert(memory);
+
+  // Huge page memory is to for a IPV4UDPQueue object
+  struct IPV4UDPQueue *queue = (struct IPV4UDPQueue *)memory->hugePageMemory;
+
+  // Set extents: [start, end)
+  queue->start = (const char *)memory->hugePageMemory;
+  queue->end = (const char *)(start + memory->actualSizeBytes);
+
+  char valid = 1;
+
+  // Allocate memory protection domain
+  if (0==(queue->pd = ibv_alloc_pd(context))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_initialize_ipv4_udp_queue: ibv_alloc_pd failed: %s (errno %d)\n",
+      strerror(rc), rc);
+    valid = 0;
+  }
+
+  // Allocate memory region with protection
+  if (valid && queue->pd) {
+    int flags = 0;
+    flags |= IBV_ACCESS_LOCAL_READ;
+    flags |= IBV_ACCESS_LOCAL_WRITE;
+    flags |= IBV_ACCESS_RELAXED_ORDERING;
+    queue->mr = ibv_reg_mr(queue->pd, queue->start, memory->actualSizeBytes, flags);
+    if (0==queue->mr) {
+      int rc = errno;
+      fprintf(stderr, "warn : ice_ib_initialize_ipv4_udp_queue: ibv_reg_mr failed: %s (errno %d)\n",
+        strerror(rc), rc);
+      valid = 0;
+  }
+
+  // Allocate a completion queue
+  if (0==(queue->cq = ibv_create_cq(context, completionQueueSize, 0, 0, 0))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_initialize_ipv4_udp_queue: ibv_create_cq failed: %s (errno %d)\n",
+      strerror(rc), rc);
+    valid = 0;
+  }
+
+  return valid ? 0 : ICE_IB_ERROR_API_ERROR;
+}
+
+int ice_ib_deinitialize_ipv4_udp_queue(HugePageMemory *memory) {
+  assert(memory);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_context *context, struct Session *session) {
   assert(param);
   assert(context);
   assert(session);
 
   // Initialize session
-  int valid = 1;
-  memset(session, 0, sizeof(struct SessionParam));
+  memset(session, 0, sizeof(struct Session));
+
+  // Start initializing session
+  char valid = 1;
+  session->userParam = param;
+  session->context = context;
 
   // Get source/dest IPV4 IP addresses into network ready binary format
-  if (0==(inet_pton(AF_INET, param->serverIpAddr, &session->serverIpAddr))) {
+  if (0==(inet_pton(AF_INET, param->clientIpAddr, &session->srcIpAddr))) {
     int rc = errno;
-    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->serverIpAddr,
+    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->clientIpAddr,
       strerror(rc), rc);
     valid = 0;
   }
-  if (0==(inet_pton(AF_INET, param->clientIpAddr, &session->clientIpAddr))) {
+  if (0==(inet_pton(AF_INET, param->serverIpAddr, session->common->dstIpAddr))) {
     int rc = errno;
-    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->clientIpAddr,
+    fprintf(stderr, "warn : ice_ib_allocate_session: inet_pton failed on '%s': %s (errno %d)\n", param->serverIpAddr,
       strerror(rc), rc);
     valid = 0;
   }
 
   // Get source/dest IP MAC addreses into network ready binary format
   uint32_t macData[6];
-  if (6!=(sscanf(param->serverMac, "%02x:%02x:%02x:%02x:%02x:%02x",
-    macData+0, macData+1, macData+2,
-    macData+3, macData+4, macData+5))) {
-    int rc = errno;
-    fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
-      param->serverMac, strerror(rc), rc);
-    valid = 0;
-  }
-  for (uint16_t i=0; i<6; ++i) {
-    session->serverMac[i] = (uint8_t)(macData[i] & 0xff);
-  }
-
-  // Get source/dest IP MAC addreses into network ready binary format
-  if (6!=(sscanf(param->clientMac, "%02x:%02x:%02x:%02x:%02x:%02x",
+  if (MAC_ADDR_SIZE!=(sscanf(param->clientMac, "%02x:%02x:%02x:%02x:%02x:%02x",
     macData+0, macData+1, macData+2,
     macData+3, macData+4, macData+5))) {
     int rc = errno;
@@ -75,106 +230,65 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
       param->clientMac, strerror(rc), rc);
     valid = 0;
   }
-  for (uint16_t i=0; i<6; ++i) {
-    session->serverMac[i] = (uint8_t)(macData[i] & 0xff);
+  for (uint16_t i=0; i<MAC_ADDR_SIZE; ++i) {
+    session->common->srcMac[i] = (uint8_t)(macData[i] & 0xff);
+  }
+  if (MAC_ADDR_SIZE!=(sscanf(param->serverMac, "%02x:%02x:%02x:%02x:%02x:%02x",
+    macData+0, macData+1, macData+2,
+    macData+3, macData+4, macData+5))) {
+    int rc = errno;
+    fprintf(stderr, "warn : ice_ib_allocate_session: MAC address invalid '%s': %s (errno %d)\n",
+      param->serverMac, strerror(rc), rc);
+    valid = 0;
+  }
+  for (uint16_t i=0; i<MAC_ADDR_SIZE; ++i) {
+    session->common->dstMac[i] = (uint8_t)(macData[i] & 0xff);
   }
 
   // Get source/dest IPV4 IP ports into network ready binary format
-  session->serverPort = htons(param->serverPort);
-  session->clientPort = htons(param->clientPort);
+  session->common->srcPort = htons(param->clientPort);
+  session->common->dstPort = htons(param->serverPort);
 
   // No point continuing if addresses bad
   if (!valid) {
     return ICE_IB_ERROR_BAD_IP_ADDR;
   }
 
-  // Allocate memory
-  if (0==(session->qp = (struct ibv_qp *)malloc(sizeof(struct ibv_qp)))) {
-    valid = 0;
+  // Get memory for send queue
+  if (0!=(ice_ib_allocate_huge_memory(sizeof(IPV4UDPQueue), &session->sendMemory))) {
+    return ICE_IB_ERROR_NO_MEMORY;
   }
-  
-  if (0==(session->qpExt = (struct ibv_qp_ex *)malloc(sizeof(struct ibv_qp_ex)))) {
-    valid = 0;
+  session->send = (struct IPV4UDPQueue *)(session->sendMemory.hugePageMemory);
+
+  // Get memory for recv queue
+  if (0!=(ice_ib_allocate_huge_memory(sizeof(IPV4UDPQueue), &session->recvMemory))) {
+    return ICE_IB_ERROR_NO_MEMORY;
   }
+  session->recv = (struct IPV4UDPQueue *)(session->recvMemory.hugePageMemory);
 
-  if (0==(session->devQp = (struct mlx5dv_qp_ex *)malloc(sizeof(struct mlx5dv_qp_ex)))) {
-    valid = 0;
+  // Get memory for common data
+  if (0!=(ice_ib_allocate_huge_memory(sizeof(SessionCommon), &session->cmmnMemory))) {
+    return ICE_IB_ERROR_NO_MEMORY;
   }
+  session->common = (struct SessionCommon *)(session->cmmnMemory.hugePageMemory);
 
-  if (0==(session->mr = (struct ibv_mr *)malloc(sizeof(struct ibv_mr)))) {
-    valid = 0;
-  }
+  // Initialize send queue
+  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->sendMemory);
 
-  if (0==(session->sge = (struct ibv_sge *)malloc(sizeof(struct ibv_sge)))) {
-    valid = 0;
-  }
+  // Initialize recv queue
+  if (0!=(ice_ib_initialize_ipv4_udp_queue(&session->recvMemory);
 
-  if (param->useHugePages) {
-    if (0==(session->pd = ibv_alloc_pd((struct ibv_context *)context))) {
-      valid = 0;
-    }
+  // Initialize data common to send receive
+  if (0!=(ice_ib_initialize_session_common(&session->commonMemory);
 
-    session->hugePageAlignSizeBytes = 4096;                                                                                             
-    session->needHugePageSizeBytes = 8192; 
 
-    uint64_t buf_size;
-    uint64_t alignment = (((session->hugePageAlignSizeBytes +HUGEPAGE_ALIGN_2MB-1)/HUGEPAGE_ALIGN_2MB) * HUGEPAGE_ALIGN_2MB);
-    buf_size = (((session->needHugePageSizeBytes + alignment-1 ) / alignment ) * alignment);
 
-    // create huge pages
-    session->shmid = shmget(IPC_PRIVATE, buf_size, SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
-    if (session->shmid < 0) {
-      int rc = errno;
-      fprintf(stderr, "warn : ice_ib_allocate_session: cannot allocate %lu bytes of hugepage memory: %s (errno %d)\n",
-        buf_size, strerror(rc), rc);
-      valid = 0;
-    }
 
-    // attach shared memory
-    session->hugePageMemory = (void *)shmat(session->shmid, 0, 0);
-    if (session->hugePageMemory==(void*)(-1)) {
-      int rc = errno;
-      fprintf(stderr, "warn : ice_ib_allocate_session: cannot attach %lu bytes of hugepage memory: %s (errno %d)\n",
-        buf_size, strerror(rc), rc);
-      session->hugePageMemory = 0;
-      valid = 0;
-    }
-    // the next packet will be allocated from here
-    session->currentPacket = session->nextPacket = (uint8_t*)(session->hugePageMemory);
-    // Make sure it's on a CP cache boundary
-    assert(((uint64_t)(session->currentPacket) % CPU_CACHE_LINE_SIZE_BYTES)==0);
 
-    // Mark shmem for auto removal
-    if (shmctl(session->shmid, IPC_RMID, 0) != 0) {
-      int rc = errno;
-      fprintf(stderr, "warn : ice_ib_allocate_session: hugepage memory cannot auto-delete: %s (errno %d)\n",
-        strerror(rc), rc);
-    }
 
-    // Initialize memory zero
-    memset(session->hugePageMemory, 0, buf_size);
-    session->hugePageSizeBytes = buf_size;
 
-    int flags = IBV_ACCESS_LOCAL_WRITE;
-    flags |= IBV_ACCESS_RELAXED_ORDERING;  // disable_pcir?
- 
-    if (session->pd && session->hugePageMemory) {
-      session->mr = ibv_reg_mr(session->pd, session->hugePageMemory, session->hugePageSizeBytes, flags);
-      if (0==session->mr) {
-        int rc = errno;
-        fprintf(stderr, "warn : ice_ib_allocate_session: ibv_reg_mr failed: %s (errno %d)\n",
-          strerror(rc), rc);
-        valid = 0;
-      }
-    }
-  }
 
-  if (0==(session->send_cq = ibv_create_cq((struct ibv_context *)context, param->txQueueSize, 0, 0, 0))) {
-    int rc = errno;
-    fprintf(stderr, "warn : ice_ib_allocate_session: ibv_create_cq failed: %s (errno %d)\n",
-      strerror(rc), rc);
-    valid = 0;
-  }
+
 
   if (0==(session->recv_cq = ibv_create_cq((struct ibv_context *)context, param->rxQueueSize, 0, 0, 0))) {
     int rc = errno;
@@ -238,13 +352,11 @@ int ice_ib_allocate_session(const struct UserParam *param, const struct ibv_cont
     }
   }
 
-  session->userParam = param;
-  session->context = context;
 
   return valid ? 0 : ICE_IB_ERROR_NO_MEMORY;
 }
 
-int ice_ib_deallocate_session(struct SessionParam *session) {
+int ice_ib_deallocate_session(struct Session *session) {
   assert(session);
 
   if (session->qpExt) {
@@ -275,12 +387,12 @@ int ice_ib_deallocate_session(struct SessionParam *session) {
     ibv_dealloc_pd(session->pd);
   }
 
-  memset(session, 0, sizeof(struct SessionParam));
+  memset(session, 0, sizeof(struct Session));
 
   return 0;
 }
 
-int ice_ib_set_rtr(struct SessionParam *session) {
+int ice_ib_set_rtr(struct Session *session) {
   assert(session);
 
   struct ibv_qp_attr attr;
@@ -303,7 +415,7 @@ int ice_ib_set_rtr(struct SessionParam *session) {
   return rc;
 }
 
-int ice_ib_set_rts(struct SessionParam *session) {
+int ice_ib_set_rts(struct Session *session) {
   assert(session);
 
   struct ibv_qp_attr attr;
