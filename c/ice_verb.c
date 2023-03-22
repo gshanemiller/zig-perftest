@@ -130,13 +130,20 @@ int ice_verb_initialize_queue(struct ibv_pd *pd, struct ibv_context *context, st
   assert(context);
   assert(memory);
 
-  // This huge page memory is for a Queue object
+  // This huge page memory is for a Queue object so cast to type
   struct Queue *queue = (struct Queue *)memory->hugePageMemory;
 
-  // Set extents: [start, end)
-  queue->start = (const uint8_t *)memory->hugePageMemory;
-  queue->end = (const uint8_t *)(queue->start + memory->actualSizeBytes);
-  assert((queue->end-queue->start)==memory->actualSizeBytes);
+  // Packet space is in the tail of the same huge page memory starting at sizeof(Queue)
+  uint64_t startOffset = (uint64_t)memory->hugePageMemory + sizeof(Queue);
+  // Round startOffst up to next cache line
+  if (startOffset & CPU_CACHE_LINE_SIZE_MASK) {
+    offset += CPU_CACHE_LINE_SIZE_BYTES - (startOffset & CPU_CACHE_LINE_SIZE_MASK);
+  }
+  assert((startOffset % CPU_CACHE_LINE_SIZE_BYTES)==0);
+  queue->packetBufferStart = memory->hugePageMemory + startOffset;
+  queue->packetBufferEnd   = memory->hugePageMemory + memory->actualSizeBytes;
+  assert(queue->packetBufferEnd > queue->packetBufferStart);
+  assert((queue->packetBufferEnd-queue->packetBufferStart)<=memory->actualSizeBytes);
 
   // Assume will succeed
   char valid = 1;
@@ -191,7 +198,7 @@ int ice_verb_initialize_session_common(const struct UserParam *param, struct Que
   assert(deviceList);
   assert(memory);
 
-  // This huge page memory is for a SessionCommon object
+  // This huge page memory is for a SessionCommon object so cast to type
   struct SessionCommon *common = (struct SessionCommon *)memory->hugePageMemory;
 
   // Save simple state
@@ -410,19 +417,14 @@ int ice_verb_initialize_endpoint(const char *mac, const char *ipAddr, uint16_t p
   return valid ? 0 : ICE_IB_ERROR_BAD_IP_ADDR;
 }
 
-int ice_verb_make_ipv4packet(struct Queue *queue, struct IPV4UDPEndpoint *src, struct IPV4UDPEndpoint *dst,
-  uint16_t payloadSizeBytes) {
+int ice_verb_make_raw_ipv4packet(struct Queue *queue, struct IPV4UDPEndpoint *src, struct IPV4UDPEndpoint *dst) {
   assert(queue);
   assert(src);
   assert(dst);
-  assert(payloadSizeBytes>0);
-
-  // Make this packet at next free offset in [start, end)
-  char *packet = 0;
 
   // Find the start of future next packet (the one made on next call to
   // ice_verb_make_ipv4packet) and make sure it's on a on CPU_CACHE_SIZE boundary
-  uint64_t offset = (uint64_t)packet + sizeof(struct IPV4Packet) + payloadSizeBytes;
+  uint64_t offset = (uint64_t)packet + sizeof(struct IPV4Packet);
   if (offset & CPU_CACHE_LINE_SIZE_MASK) {
     offset += CPU_CACHE_LINE_SIZE_BYTES - (offset & CPU_CACHE_LINE_SIZE_MASK);
   }
@@ -432,8 +434,8 @@ int ice_verb_make_ipv4packet(struct Queue *queue, struct IPV4UDPEndpoint *src, s
   char *nextPacket = packet + offset;
   struct IPV4Packet *packetObj = (struct IPV4Packet *)packet;
 
-  const uint16_t ipv4_header_size = sizeof(struct IPV4Header) + sizeof(struct IPV4UDPHeader) + payloadSizeBytes;
-  const uint16_t udp_header_size  = sizeof(struct IPV4UDPHeader) + payloadSizeBytes;
+  const uint16_t ipv4_header_size = sizeof(struct IPV4Header) + sizeof(struct IPV4UDPHeader) + sizoef(struct Payload);
+  const uint16_t udp_header_size  = sizeof(struct IPV4UDPHeader) + sizeof(struct Payload);
 
   // IP header
   memcpy(packetObj->ip_header.dstMac, dst->mac, sizeof(packetObj->ip_header.dstMac));

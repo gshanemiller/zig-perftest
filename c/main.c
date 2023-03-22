@@ -11,10 +11,8 @@ int main() {
   strcpy(param.serverIpAddr, "192.168.0.2");
   param.clientPort = 10011;
   param.serverPort = 10013;
-  param.iters = 1;
-  param.payloadSize = 128;
+  param.iters = 100;
   param.portId = 1;
-  param.useHugePages = 1;
   param.isServer = 0;
 
   struct Session session;
