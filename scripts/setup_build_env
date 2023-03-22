@@ -85,6 +85,8 @@ echo 'set history save on' >> ~/.config/gdb/gdbinit
 # git needs this
 git config --global user.email "gshanemiller6@gmail.com"
 git config --global user.name "smiller"
+git config --global credential.helper store
+git config --global credential.helper cache
 
 # setup run env so can
 ./scripts/setup_run_env
