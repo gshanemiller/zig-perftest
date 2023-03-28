@@ -28,8 +28,8 @@ enum ICE_IB_Error {
 
 // Application payload in packets
 struct Payload {
-  uint64_t                  createRdtscTimestamp;             // rdtsc value when packet created
   uint64_t                  sequenceId;                       // payload sequence number
+  uint64_t                  createTimestamp;                  // rdtsc value when packet created
 };
 
 #pragma pack(push,1)
