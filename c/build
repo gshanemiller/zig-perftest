@@ -3,6 +3,12 @@
 CC_OPTS="-D_GNU_SOURCE -g -O0 -Wall -march=native -std=c2x -I. -I/usr/include -I/usr/include/infiniband -I/usr/include/x86_64-linux-gnu"
 LD_OPTS="-L /usr/lib/x86_64-linux-gnu -lm -lmlx5 -lefa -lrdmacm -libverbs -lpci -lpthread -lnl-route-3 -lnl-3"
 
+# ib without mlx5
 gcc ${CC_OPTS} -c main.c -o main.o
 gcc ${CC_OPTS} -c ice_verb.c -o ice_verb.o
 gcc main.o ice_verb.o -o ib ${LD_OPTS}
+
+# ib with mlx5
+gcc ${CC_OPTS} -c main_mlx5.c -o main_mlx5.o
+gcc ${CC_OPTS} -c ice_mlx5.c -o ice_mlx5.o
+gcc main_mlx5.o ice_verb.o -o ib_mlx5 ${LD_OPTS}
